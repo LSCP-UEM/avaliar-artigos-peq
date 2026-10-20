@@ -345,8 +345,28 @@ export function calcularNotaManual(percentil, n_autores, regras) {
   };
 }
 
+/** Consulta o Fator de Impacto (JCR) e Quartil oficial a partir dos ISSNs ou título. */
+export function consultarJcr(baseJcr, issns = [], titulos = []) {
+  if (!baseJcr) return { jcr: null, jcr_quartil: null };
+  for (const i of issns) {
+    const limpo = normalizarIssn(i);
+    if (limpo && baseJcr.issn?.[limpo]) {
+      const [jif, q] = baseJcr.issn[limpo];
+      return { jcr: jif, jcr_quartil: q };
+    }
+  }
+  for (const t of titulos) {
+    const tNorm = normalizarTitulo(t);
+    if (tNorm && baseJcr.titulos?.[tNorm]) {
+      const [jif, q] = baseJcr.titulos[tNorm];
+      return { jcr: jif, jcr_quartil: q };
+    }
+  }
+  return { jcr: null, jcr_quartil: null };
+}
+
 /** Pipeline completo de um DOI. */
-export async function avaliarDoi(doi, { indice, regras, email } = {}) {
+export async function avaliarDoi(doi, { indice, regras, baseJcr, email } = {}) {
   try {
     const [cr, oa] = await Promise.all([
       buscarCrossref(doi, email).catch(() => null),
@@ -354,8 +374,9 @@ export async function avaliarDoi(doi, { indice, regras, email } = {}) {
     ]);
     if (!cr && !oa) return { doi, link_doi: `https://doi.org/${doi}`, status: "doi_nao_encontrado", motivo: "DOI não localizado no Crossref nem no OpenAlex" };
     const meta = combinarMetadados(doi, cr, oa);
-    if (!indice || !regras) return { ...meta, status: "sem_base", motivo: "Base de periódicos não carregada" };
-    return { ...meta, ...avaliarRevista(meta, indice, regras) };
+    const dadosJcr = consultarJcr(baseJcr, meta.issns, [meta.revista, meta.revista_abrev]);
+    if (!indice || !regras) return { ...meta, ...dadosJcr, status: "sem_base", motivo: "Base de periódicos não carregada" };
+    return { ...meta, ...dadosJcr, ...avaliarRevista(meta, indice, regras) };
   } catch (e) {
     return { doi, link_doi: `https://doi.org/${doi}`, status: "erro", motivo: `Erro: ${e.message || e}` };
   }

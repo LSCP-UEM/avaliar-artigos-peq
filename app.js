@@ -33,6 +33,7 @@ const el = {
 
 let indice = null;
 let regras = null;
+let baseJcr = null;
 let resultados = [];
 let cancelando = false;
 
@@ -43,6 +44,13 @@ async function carregarBases() {
   try {
     const respRegras = await fetch("data/regras.json");
     if (respRegras.ok) regras = await respRegras.json();
+
+    try {
+      const respJcr = await fetch("data/jcr.json");
+      if (respJcr.ok) baseJcr = await respJcr.json();
+    } catch (e) {
+      console.warn("Base JCR não carregada:", e);
+    }
 
     // Tenta primeiro o citescore com percentis embutidos; se não existir, usa a lista oficial de fontes
     let respFontes = await fetch("data/citescore.json");
@@ -76,8 +84,15 @@ function badgeEstrato(estrato) {
 
 function linhaPrincipal(r, i, aberta = false) {
   const autoresStr = r.n_autores
-    ? `${r.n_autores} autor(es)${r.n_autores > 4 ? ` <small style="color:var(--suave);">(fator ${fmt(r.fator_divisao, 3)})</small>` : ""}`
+    ? `${r.n_autores} autor(es)${r.n_autores > 4 ? ` <small style="color:var(--suave);">(mult. ${fmt(r.fator_divisao, 3)})</small>` : ""}`
     : "—";
+
+  const jcrBadge = r.jcr != null
+    ? `<div style="font-size: 11px; margin-top: 3px;" title="Journal Impact Factor 2026 (Clarivate Web of Science)">
+         <span style="color: var(--suave);">JCR:</span> <strong style="color: #0969da;">${fmt(r.jcr, 3)}</strong>
+         ${r.jcr_quartil ? `<span class="badge ${r.jcr_quartil}" style="font-size: 10px; padding: 1px 5px; margin-left: 2px;">${esc(r.jcr_quartil)}</span>` : ""}
+       </div>`
+    : `<div style="font-size: 11px; color: #8c959f; margin-top: 3px;" title="Revista não indexada no JCR 2026">JCR: —</div>`;
 
   const btnScopus = r.link_revista
     ? `<a href="${esc(r.link_revista)}" target="_blank" rel="noopener" class="btn-scopus" title="Abrir perfil na Scopus">🔗 Scopus ↗</a>`
@@ -116,7 +131,10 @@ function linhaPrincipal(r, i, aberta = false) {
       <strong>${esc(r.revista || "—")}</strong>
       ${r.scopus_ativa === false ? ' <small style="color:#cf222e;">(Descontinuada)</small>' : ""}
     </td>
-    <td>${autoresStr}</td>
+    <td>
+      <div>${autoresStr}</div>
+      ${jcrBadge}
+    </td>
     <td>${areaEditalStr}</td>
     <td style="text-align: center;">${btnScopus}</td>
     <td style="text-align: center;">
@@ -139,6 +157,7 @@ function detalhe(r) {
     ["Lista de autores", esc((r.autores || []).join("; ") || "—")],
     ["Revista oficial", `${esc(r.revista || "—")} ${r.scopus_source_id ? `(Scopus Source ID: ${esc(r.scopus_source_id)})` : ""}`],
     ["ISSN(s)", (r.issns || []).map(formatarIssn).join(", ") || "—"],
+    ["Fator de Impacto JCR (2026)", r.jcr != null ? `<strong>${fmt(r.jcr, 3)}</strong>${r.jcr_quartil ? ` (${r.jcr_quartil})` : ""} · Clarivate Web of Science` : "Não localizado na base JCR 2026"],
     ["Publicação", [r.data_publicacao || r.ano, r.volume && `Vol. ${r.volume}`, r.numero && `Nº ${r.numero}`, r.paginas && `Págs. ${r.paginas}`].filter(Boolean).map(esc).join(" · ") || "—"],
     ["Citações do artigo", `Crossref: ${fmt(r.citacoes_crossref, 0)} · OpenAlex: ${fmt(r.citacoes_openalex, 0)}${r.fwci != null ? ` · FWCI: ${fmt(r.fwci)}` : ""}`],
     ["Acesso Aberto", r.acesso_aberto ? `${esc(r.acesso_aberto)}${r.link_acesso_aberto ? ` (<a href="${esc(r.link_acesso_aberto)}" target="_blank">PDF disponível</a>)` : ""}` : "Não informado"],
@@ -241,7 +260,7 @@ async function avaliar() {
     await emParalelo(
       dois,
       CONCORRENCIA,
-      (doi) => avaliarDoi(doi, { indice, regras, email: EMAIL_CONTATO }),
+      (doi) => avaliarDoi(doi, { indice, regras, baseJcr, email: EMAIL_CONTATO }),
       (r, i) => {
         resultados[i] = r;
         feitos++;
@@ -354,7 +373,7 @@ el.filtroTabela?.addEventListener("input", (ev) => {
     const r = resultados[idx];
     const det = tr.nextElementSibling;
     if (!r) return;
-    const textoCompleto = `${r.doi || ""} ${r.titulo || ""} ${r.revista || ""} ${r.ano || ""} ${(r.autores || []).join(" ")} ${r.estrato || ""} ${r.area_principal || r.areas_edital || ""}`.toLowerCase();
+    const textoCompleto = `${r.doi || ""} ${r.titulo || ""} ${r.revista || ""} ${r.ano || ""} ${(r.autores || []).join(" ")} ${r.estrato || ""} ${r.area_principal || r.areas_edital || ""} ${r.jcr || ""} ${r.jcr_quartil || ""}`.toLowerCase();
     const bate = !termo || textoCompleto.includes(termo);
     tr.style.display = bate ? "" : "none";
     if (det && det.classList.contains("detalhe")) {
@@ -375,7 +394,9 @@ const COLUNAS_CSV = [
   ["Ano", (r) => r.ano],
   ["Autores", (r) => (r.autores || []).join("; ")],
   ["Nº Autores", (r) => r.n_autores],
-  ["Fator Divisão", (r) => r.fator_divisao],
+  ["Multiplicador Autoria", (r) => r.fator_divisao],
+  ["JCR Impact Factor", (r) => (r.jcr != null ? r.jcr : "")],
+  ["JCR Quartil", (r) => r.jcr_quartil || ""],
   ["Indexada Scopus", (r) => (r.scopus_source_id ? "SIM" : "NÃO")],
   ["Status Scopus", (r) => (r.scopus_ativa === false ? "Descontinuada" : (r.scopus_source_id ? "Ativa" : ""))],
   ["Área Edital", (r) => r.area_principal || r.areas_edital || ""],

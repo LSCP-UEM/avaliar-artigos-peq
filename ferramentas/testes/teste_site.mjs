@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
   extrairDois, normalizarIssn, montarIndice, calcularEstrato, fatorAutores,
-  melhorArea, avaliarDoi, avaliarRevista,
+  melhorArea, avaliarDoi, avaliarRevista, consultarJcr,
 } from "../../logica.js";
 
 const aqui = dirname(fileURLToPath(import.meta.url));
@@ -56,6 +56,16 @@ await teste("fatorAutores igual ao calcular_nota_fracionada", () => {
   assert.equal(fatorAutores(1), 1); assert.equal(fatorAutores(4), 1);
   assert.equal(fatorAutores(5), 0.8); assert.equal(fatorAutores(8), 0.5);
   assert.equal(fatorAutores(0), 1); assert.equal(fatorAutores("x"), 1);
+});
+
+await teste("consultarJcr: encontra JIF e quartil por ISSN e título", () => {
+  const baseJcrFicticia = {
+    issn: { "13858947": [12.5, "Q1"] },
+    titulos: { "nature": [56.1, "Q1"] }
+  };
+  assert.deepEqual(consultarJcr(baseJcrFicticia, ["1385-8947"]), { jcr: 12.5, jcr_quartil: "Q1" });
+  assert.deepEqual(consultarJcr(baseJcrFicticia, [], ["Nature"]), { jcr: 56.1, jcr_quartil: "Q1" });
+  assert.deepEqual(consultarJcr(baseJcrFicticia, ["9999-9999"]), { jcr: null, jcr_quartil: null });
 });
 
 await teste("base fictícia: ISSN com zero perdido no Excel e aba/linha de cabeçalho detectadas", () => {

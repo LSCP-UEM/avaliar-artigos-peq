@@ -17,6 +17,7 @@ const el = {
   btnImportarLattes: $("btnImportarLattes"),
   arquivoLattes: $("arquivoLattes"),
   btnLimpar: $("btnLimpar"),
+  btnToggleTodos: $("btnToggleTodos"),
   csv: $("btnCsv"),
   status: $("status"),
   container: $("containerTabela"),
@@ -70,7 +71,7 @@ function badgeEstrato(estrato) {
   return `<span class="badge ${estrato}">${esc(estrato)}</span>`;
 }
 
-function linhaPrincipal(r, i) {
+function linhaPrincipal(r, i, aberta = false) {
   const autoresStr = r.n_autores
     ? `${r.n_autores} autor(es)${r.n_autores > 4 ? ` <small style="color:var(--suave);">(fator ${fmt(r.fator_divisao, 3)})</small>` : ""}`
     : "—";
@@ -92,10 +93,20 @@ function linhaPrincipal(r, i) {
   const readonly = r.status === "ok" && r.ano_citescore ? "readonly" : "";
 
   return `
-    <td class="num" style="color:var(--suave);">${i + 1}</td>
+    <td class="col-indice">
+      <button type="button" class="btn-exp-icone" title="${aberta ? "Ocultar detalhes" : "Expandir detalhes"}" aria-expanded="${aberta}">
+        <span class="seta-exp">${aberta ? "▼" : "▶"}</span>
+      </button>
+      <span style="color:var(--suave); font-weight:600;">${i + 1}</span>
+    </td>
     <td style="max-width: 380px;">
       <div class="tit">${esc(r.titulo || r.motivo || "Carregando...")}${r.retratado ? ' <span class="badge cinza" style="background:#cf222e;color:#fff;">RETRATADO</span>' : ""}</div>
-      <div class="doi"><a href="${esc(r.link_doi)}" target="_blank">${esc(r.doi)}</a></div>
+      <div class="doi">
+        <a href="${esc(r.link_doi)}" target="_blank">${esc(r.doi)}</a>
+        <button type="button" class="btn-mais-info" title="${aberta ? "Ocultar ficha completa" : "Ver autores, ISSN, citações e áreas Scopus"}">
+          <span class="seta-info">${aberta ? "➖" : "➕"}</span> ${aberta ? "Menos informações" : "Mais informações"}
+        </button>
+      </div>
     </td>
     <td class="num">${r.ano ?? "—"}</td>
     <td style="max-width: 240px;">
@@ -159,7 +170,8 @@ function desenharLinha(i) {
   const r = resultados[i];
   const tr = el.corpo.querySelector(`tr.linha[data-i="${i}"]`);
   if (!tr) return;
-  tr.innerHTML = linhaPrincipal(r, i);
+  const aberta = tr.classList.contains("aberta");
+  tr.innerHTML = linhaPrincipal(r, i, aberta);
   const det = tr.nextElementSibling;
   if (det && det.classList.contains("detalhe")) {
     det.innerHTML = detalhe(r);
@@ -195,6 +207,8 @@ async function avaliar() {
 
   el.btn.disabled = true;
   el.csv.disabled = true;
+  todosAbertos = false;
+  if (el.btnToggleTodos) el.btnToggleTodos.textContent = "➕ Expandir Todos";
   resultados = dois.map((doi) => ({ doi, status: "carregando" }));
 
   el.corpo.innerHTML = resultados.map((_, i) => `
@@ -255,15 +269,47 @@ el.corpo.addEventListener("input", (ev) => {
   }
 });
 
+function alternarLinha(tr) {
+  if (!tr) return;
+  const det = tr.nextElementSibling;
+  if (!det || !det.classList.contains("detalhe")) return;
+  const abrir = det.hidden;
+  det.hidden = !abrir;
+  tr.classList.toggle("aberta", abrir);
+
+  const setaExp = tr.querySelector(".seta-exp");
+  if (setaExp) setaExp.textContent = abrir ? "▼" : "▶";
+
+  const btnExp = tr.querySelector(".btn-exp-icone");
+  if (btnExp) {
+    btnExp.setAttribute("aria-expanded", String(abrir));
+    btnExp.title = abrir ? "Ocultar detalhes" : "Expandir detalhes";
+  }
+
+  const btnMais = tr.querySelector(".btn-mais-info");
+  if (btnMais) {
+    btnMais.innerHTML = `<span class="seta-info">${abrir ? "➖" : "➕"}</span> ${abrir ? "Menos informações" : "Mais informações"}`;
+    btnMais.title = abrir ? "Ocultar ficha completa" : "Ver autores, ISSN, citações e áreas Scopus";
+  }
+}
+
 el.corpo.addEventListener("click", (ev) => {
   if (ev.target.closest("a") || ev.target.closest("input")) return;
   const tr = ev.target.closest("tr.linha");
-  if (tr) {
+  if (tr) alternarLinha(tr);
+});
+
+let todosAbertos = false;
+el.btnToggleTodos?.addEventListener("click", () => {
+  todosAbertos = !todosAbertos;
+  const linhas = el.corpo.querySelectorAll("tr.linha");
+  linhas.forEach((tr) => {
     const det = tr.nextElementSibling;
-    if (det && det.classList.contains("detalhe")) {
-      det.hidden = !det.hidden;
+    if (det && det.classList.contains("detalhe") && det.hidden === todosAbertos) {
+      alternarLinha(tr);
     }
-  }
+  });
+  el.btnToggleTodos.textContent = todosAbertos ? "➖ Recolher Todos" : "➕ Expandir Todos";
 });
 
 // ---------------------------------------------------------------------------
@@ -403,6 +449,8 @@ el.btnLimpar?.addEventListener("click", () => {
   el.status.textContent = "";
   el.csv.disabled = true;
   resultados = [];
+  todosAbertos = false;
+  if (el.btnToggleTodos) el.btnToggleTodos.textContent = "➕ Expandir Todos";
 });
 
 carregarBases();

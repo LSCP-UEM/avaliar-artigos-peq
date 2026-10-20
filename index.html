@@ -157,8 +157,85 @@
       text-align: right;
       white-space: nowrap;
     }
+    .tabela-barra-topo {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 14px;
+      background: #fafbfc;
+      border-bottom: 1px solid var(--borda);
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    tr.linha {
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+    }
     tr.linha:hover td {
-      background: #f9fbfd;
+      background: #f4f8fd;
+    }
+    tr.linha.aberta td {
+      background: #eff6ff;
+      border-bottom-color: #dbeafe;
+    }
+    .col-indice {
+      white-space: nowrap;
+      text-align: center;
+      width: 64px;
+    }
+    .btn-exp-icone {
+      background: #fff;
+      border: 1px solid var(--borda);
+      color: var(--azul);
+      border-radius: 4px;
+      width: 22px;
+      height: 22px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      cursor: pointer;
+      padding: 0;
+      margin-right: 4px;
+      vertical-align: middle;
+      transition: all 0.15s ease;
+    }
+    .btn-exp-icone:hover {
+      background: #e7f3fe;
+      border-color: var(--azul);
+    }
+    tr.linha.aberta .btn-exp-icone {
+      background: var(--azul);
+      color: #fff;
+      border-color: var(--azul);
+    }
+    .btn-mais-info {
+      background: #f0f7ff;
+      border: 1px solid #bfdbfe;
+      color: var(--azul);
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 7px;
+      margin-left: 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      vertical-align: middle;
+      transition: all 0.15s ease;
+    }
+    .btn-mais-info:hover {
+      background: #dbeafe;
+      border-color: #93c5fd;
+    }
+    tr.linha.aberta .btn-mais-info {
+      background: #fee2e2;
+      border-color: #fca5a5;
+      color: #b91c1c;
+    }
+    tr.linha.aberta .btn-mais-info:hover {
+      background: #fecaca;
     }
     tr.detalhe td {
       background: #fbfcfd;
@@ -348,10 +425,18 @@
   </div>
 
   <div class="tabela-container" id="containerTabela" hidden>
+    <div class="tabela-barra-topo">
+      <span style="font-size: 12px; color: var(--suave);">
+        💡 <strong>Dica:</strong> Clique em qualquer linha ou no botão <strong>[▶]</strong> para ver a ficha completa (ASJC, citações, autores e ISSN).
+      </span>
+      <button id="btnToggleTodos" type="button" style="font-size: 11px; padding: 4px 10px; font-weight: 600;">
+        ➕ Expandir Todos
+      </button>
+    </div>
     <table id="tabela">
       <thead>
         <tr>
-          <th>#</th>
+          <th style="width: 64px; text-align: center;">#</th>
           <th>Artigo / Título</th>
           <th>Ano</th>
           <th>Revista</th>

@@ -361,13 +361,15 @@ export async function avaliarDoi(doi, { indice, regras, email } = {}) {
   }
 }
 
-/** Executa tarefas com concorrência limitada. */
-export async function emParalelo(itens, limite, tarefa, aoTerminar) {
+/** Executa tarefas com concorrência limitada (suporta cancelamento via deveParar). */
+export async function emParalelo(itens, limite, tarefa, aoTerminar, deveParar) {
   let proximo = 0;
   const trabalhador = async () => {
     while (proximo < itens.length) {
+      if (deveParar?.()) break;
       const i = proximo++;
       const r = await tarefa(itens[i], i);
+      if (deveParar?.()) break;
       aoTerminar?.(r, i);
     }
   };

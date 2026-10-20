@@ -410,6 +410,7 @@
 
   <div class="acoes">
     <button id="btnAvaliar" class="principal">🔍 Avaliar Lista de DOIs</button>
+    <button id="btnParar" type="button" style="color: #cf222e; border-color: #fca5a5; background: #fff5f5; font-weight:600;" hidden>⏹️ Parar Consulta</button>
     <button id="btnImportarLattes" type="button" title="Carregar arquivo curriculo.xml ou página .html salva">📁 Importar Lattes (XML / HTML)</button>
     <input type="file" id="arquivoLattes" accept=".xml,.html,.htm,.txt" style="display: none;">
     <button id="btnLimpar" type="button" style="color: var(--suave);">🗑️ Limpar</button>
@@ -426,9 +427,12 @@
 
   <div class="tabela-container" id="containerTabela" hidden>
     <div class="tabela-barra-topo">
-      <span style="font-size: 12px; color: var(--suave);">
-        💡 <strong>Dica:</strong> Clique em qualquer linha ou no botão <strong>[▶]</strong> para ver a ficha completa (ASJC, citações, autores e ISSN).
-      </span>
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+        <span style="font-size: 12px; color: var(--suave);">
+          💡 <strong>Dica:</strong> Clique na linha ou no <strong>[▶]</strong> para ver a ficha completa.
+        </span>
+        <input type="search" id="filtroTabela" placeholder="🔎 Filtrar artigos por ano, título, revista ou estrato..." style="font-size: 12px; padding: 4px 10px; border: 1px solid var(--borda); border-radius: 4px; min-width: 280px;">
+      </div>
       <button id="btnToggleTodos" type="button" style="font-size: 11px; padding: 4px 10px; font-weight: 600;">
         ➕ Expandir Todos
       </button>

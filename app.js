@@ -7,17 +7,19 @@ import {
 // Configurações
 // ---------------------------------------------------------------------------
 const EMAIL_CONTATO = "";
-const CONCORRENCIA = 3;
-const LIMITE_DOIS = 300;
+const CONCORRENCIA = 4;
+const LIMITE_DOIS = 1500;
 
 const $ = (id) => document.getElementById(id);
 const el = {
   entrada: $("entrada"),
   btn: $("btnAvaliar"),
+  btnParar: $("btnParar"),
   btnImportarLattes: $("btnImportarLattes"),
   arquivoLattes: $("arquivoLattes"),
   btnLimpar: $("btnLimpar"),
   btnToggleTodos: $("btnToggleTodos"),
+  filtroTabela: $("filtroTabela"),
   csv: $("btnCsv"),
   status: $("status"),
   container: $("containerTabela"),
@@ -32,6 +34,7 @@ const el = {
 let indice = null;
 let regras = null;
 let resultados = [];
+let cancelando = false;
 
 // ---------------------------------------------------------------------------
 // Inicialização das Bases Estáticas
@@ -201,14 +204,17 @@ async function avaliar() {
     return;
   }
   if (dois.length > LIMITE_DOIS) {
-    el.status.textContent = `Limite de ${LIMITE_DOIS} DOIs por lote. Processando os primeiros ${LIMITE_DOIS}...`;
+    el.status.textContent = `Limite máximo de ${LIMITE_DOIS} DOIs por lote. Processando os primeiros ${LIMITE_DOIS}...`;
     dois = dois.slice(0, LIMITE_DOIS);
   }
 
+  cancelando = false;
   el.btn.disabled = true;
+  if (el.btnParar) el.btnParar.hidden = false;
   el.csv.disabled = true;
   todosAbertos = false;
   if (el.btnToggleTodos) el.btnToggleTodos.textContent = "➕ Expandir Todos";
+  if (el.filtroTabela) el.filtroTabela.value = "";
   resultados = dois.map((doi) => ({ doi, status: "carregando" }));
 
   el.corpo.innerHTML = resultados.map((_, i) => `
@@ -220,22 +226,42 @@ async function avaliar() {
   resultados.forEach((_, i) => desenharLinha(i));
 
   let feitos = 0;
+  const t0 = performance.now();
   const atualizarProgresso = () => {
-    el.status.textContent = `Processando ${feitos} de ${dois.length} DOIs via Crossref e Scopus...`;
+    const decorrido = (performance.now() - t0) / 1000;
+    const taxa = feitos > 0 ? (decorrido / feitos) : 0.25;
+    const restantes = dois.length - feitos;
+    const etaSeg = Math.round((restantes * taxa) / CONCORRENCIA);
+    const etaStr = etaSeg > 5 ? ` (tempo restante est.: ~${etaSeg}s)` : "";
+    el.status.textContent = `Processando ${feitos} de ${dois.length} DOIs via Crossref e Scopus...${etaStr}`;
   };
   atualizarProgresso();
 
-  await emParalelo(dois, CONCORRENCIA, (doi) => avaliarDoi(doi, { indice, regras, email: EMAIL_CONTATO }), (r, i) => {
-    resultados[i] = r;
-    feitos++;
-    desenharLinha(i);
-    atualizarProgresso();
-    atualizarPlacar();
-  });
+  try {
+    await emParalelo(
+      dois,
+      CONCORRENCIA,
+      (doi) => avaliarDoi(doi, { indice, regras, email: EMAIL_CONTATO }),
+      (r, i) => {
+        resultados[i] = r;
+        feitos++;
+        desenharLinha(i);
+        atualizarProgresso();
+        atualizarPlacar();
+      },
+      () => cancelando
+    );
+  } finally {
+    el.btn.disabled = false;
+    if (el.btnParar) el.btnParar.hidden = true;
+    el.csv.disabled = false;
+  }
 
-  el.status.textContent = `Concluído: ${feitos} artigos consultados. Clique na linha para ver mais detalhes.`;
-  el.btn.disabled = false;
-  el.csv.disabled = false;
+  if (cancelando) {
+    el.status.textContent = `⏹️ Consulta interrompida pelo usuário em ${feitos} de ${dois.length} artigos.`;
+  } else {
+    el.status.textContent = `Concluído: ${feitos} artigos consultados. Clique na linha ou em [▶] para ver detalhes.`;
+  }
   atualizarPlacar();
 }
 
@@ -310,6 +336,33 @@ el.btnToggleTodos?.addEventListener("click", () => {
     }
   });
   el.btnToggleTodos.textContent = todosAbertos ? "➖ Recolher Todos" : "➕ Expandir Todos";
+});
+
+// Botão de Interromper Consulta em Lote
+el.btnParar?.addEventListener("click", () => {
+  cancelando = true;
+  el.status.textContent = "Interrompendo consulta em lote...";
+});
+
+// Filtro rápido de pesquisa em tempo real na tabela (ano, título, revista, estrato)
+el.filtroTabela?.addEventListener("input", (ev) => {
+  const termo = ev.target.value.toLowerCase().trim();
+  const linhas = el.corpo.querySelectorAll("tr.linha");
+  let visiveis = 0;
+  linhas.forEach((tr) => {
+    const idx = Number(tr.dataset.i);
+    const r = resultados[idx];
+    const det = tr.nextElementSibling;
+    if (!r) return;
+    const textoCompleto = `${r.doi || ""} ${r.titulo || ""} ${r.revista || ""} ${r.ano || ""} ${(r.autores || []).join(" ")} ${r.estrato || ""} ${r.area_principal || r.areas_edital || ""}`.toLowerCase();
+    const bate = !termo || textoCompleto.includes(termo);
+    tr.style.display = bate ? "" : "none";
+    if (det && det.classList.contains("detalhe")) {
+      if (!bate) det.hidden = true;
+      else if (tr.classList.contains("aberta")) det.hidden = false;
+    }
+    if (bate) visiveis++;
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -442,6 +495,8 @@ el.entrada.addEventListener("drop", (ev) => {
 
 // 4. Botão Limpar
 el.btnLimpar?.addEventListener("click", () => {
+  cancelando = true;
+  if (el.btnParar) el.btnParar.hidden = true;
   el.entrada.value = "";
   el.container.hidden = true;
   el.corpo.innerHTML = "";
@@ -451,6 +506,7 @@ el.btnLimpar?.addEventListener("click", () => {
   resultados = [];
   todosAbertos = false;
   if (el.btnToggleTodos) el.btnToggleTodos.textContent = "➕ Expandir Todos";
+  if (el.filtroTabela) el.filtroTabela.value = "";
 });
 
 carregarBases();

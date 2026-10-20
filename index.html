@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Avaliador de Artigos por DOI — PEQ/UEM</title>
+  <style>
+    :root {
+      --borda: #d0d7de;
+      --suave: #57606a;
+      --fundo: #f6f8fa;
+      --azul: #0969da;
+      --verde: #1a7f37;
+      --destaque: #fff8c5;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      color: #24292f;
+      background: #fafbfc;
+    }
+    main {
+      max-width: 1350px;
+      margin: 0 auto;
+      padding: 24px 20px 60px;
+    }
+    header {
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--borda);
+    }
+    h1 {
+      font-size: 1.45rem;
+      margin: 0 0 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    p.sub {
+      margin: 0;
+      color: var(--suave);
+      font-size: 14px;
+    }
+    .aviso-topo {
+      background: #e7f3fe;
+      border: 1px solid #b6d3f8;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: #0c3d75;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 10px 12px;
+      font: 13px/1.4 ui-monospace, Consolas, monospace;
+      border: 1px solid var(--borda);
+      border-radius: 6px;
+      resize: vertical;
+      background: #fff;
+    }
+    textarea:focus {
+      outline: none;
+      border-color: var(--azul);
+      box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.15);
+    }
+    .acoes {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin: 12px 0 20px;
+      flex-wrap: wrap;
+    }
+    button {
+      font: inherit;
+      font-weight: 500;
+      padding: 7px 16px;
+      border-radius: 6px;
+      border: 1px solid var(--borda);
+      background: #fff;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    button:hover:not(:disabled) {
+      background: #f3f4f6;
+    }
+    button.principal {
+      background: var(--azul);
+      border-color: var(--azul);
+      color: #fff;
+      font-weight: 600;
+    }
+    button.principal:hover:not(:disabled) {
+      background: #085bc1;
+    }
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    #status {
+      color: var(--suave);
+      font-size: 13px;
+    }
+    .resumo-placar {
+      display: none;
+      background: #fff;
+      border: 1px solid var(--borda);
+      border-radius: 8px;
+      padding: 12px 18px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .placar-item {
+      font-size: 13px;
+      color: var(--suave);
+    }
+    .placar-item strong {
+      font-size: 16px;
+      color: #1f2328;
+    }
+    .tabela-container {
+      background: #fff;
+      border: 1px solid var(--borda);
+      border-radius: 8px;
+      overflow-x: auto;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--borda);
+      vertical-align: middle;
+    }
+    th {
+      background: var(--fundo);
+      font-weight: 600;
+      color: #333;
+      white-space: nowrap;
+    }
+    td.num {
+      text-align: right;
+      white-space: nowrap;
+    }
+    tr.linha:hover td {
+      background: #f9fbfd;
+    }
+    tr.detalhe td {
+      background: #fbfcfd;
+      padding: 14px 18px;
+    }
+    tr.detalhe[hidden] {
+      display: none;
+    }
+    .doi {
+      font: 11px ui-monospace, Consolas, monospace;
+      color: var(--suave);
+      word-break: break-all;
+    }
+    .tit {
+      font-weight: 600;
+      color: #1f2328;
+      margin-bottom: 2px;
+    }
+    .btn-scopus {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #f3f0fd;
+      color: #5b21b6;
+      border: 1px solid #ddd6fe;
+      padding: 4px 10px;
+      border-radius: 5px;
+      font-weight: 600;
+      font-size: 12px;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .btn-scopus:hover {
+      background: #ede8fc;
+      border-color: #c4b5fd;
+    }
+    .inp-perc {
+      width: 68px;
+      padding: 4px 6px;
+      font-size: 13px;
+      border: 1px solid var(--borda);
+      border-radius: 4px;
+      text-align: center;
+      font-weight: bold;
+    }
+    .inp-perc:focus {
+      outline: none;
+      border-color: var(--azul);
+    }
+    .badge {
+      display: inline-block;
+      min-width: 32px;
+      text-align: center;
+      padding: 2px 7px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .A1, .A2 { background: #1a7f37; color: #fff; }
+    .A3, .A4 { background: #2da44e; color: #fff; }
+    .A5, .A6 { background: #d4a72c; color: #fff; }
+    .A7, .A8 { background: #cf5e28; color: #fff; }
+    .cinza { background: #eaeef2; color: #57606a; font-weight: 600; }
+    .alerta-fora { color: #cf222e; font-weight: 500; font-size: 12px; }
+    .area-tag {
+      display: inline-block;
+      background: #eff6ff;
+      color: #1e40af;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      margin: 1px 0;
+      border: 1px solid #bfdbfe;
+    }
+    .grade {
+      display: grid;
+      grid-template-columns: max-content 1fr;
+      gap: 4px 16px;
+      margin: 0;
+    }
+    .grade dt { color: var(--suave); font-weight: 500; }
+    .grade dd { margin: 0; }
+    a { color: var(--azul); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    footer {
+      margin-top: 30px;
+      font-size: 12px;
+      color: var(--suave);
+      border-top: 1px solid var(--borda);
+      padding-top: 14px;
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>🎓 Avaliador de Artigos por DOI <span style="font-size: 12px; background: #e1f5fe; color: #0277bd; padding: 2px 8px; border-radius: 10px; font-weight: 600;">PEQ / UEM</span></h1>
+    <p class="sub">Cole uma lista de DOIs para extrair metadados, verificar indexação na Scopus, enquadrar na Tabela 2 do Edital e calcular a nota.</p>
+  </header>
+
+  <div class="aviso-topo">
+    <div style="font-size: 16px;">💡</div>
+    <div>
+      <strong>Como funciona:</strong> Os metadados de autoria e publicação são obtidos via Crossref/OpenAlex. A revista é cruzada com as <strong>49.104 fontes oficiais da Scopus</strong>. Clique no botão da Scopus para abrir a revista, copie o <strong>Percentil CiteScore</strong> da sua subárea e digite-o no campo para calcular o Estrato (A1–A8) e a Nota Fracionada instantaneamente.
+    </div>
+  </div>
+
+  <textarea id="entrada" placeholder="Cole os DOIs aqui (um por linha, com ou sem prefixo https://doi.org/)...&#10;10.1016/j.cej.2020.127573&#10;10.1016/j.jcis.2021.05.042&#10;10.1038/s41586-020-2649-2"></textarea>
+
+  <div class="acoes">
+    <button id="btnAvaliar" class="principal">🔍 Avaliar Lista de DOIs</button>
+    <button id="btnCsv" disabled>📥 Baixar Planilha Consolidada (CSV)</button>
+    <span id="status"></span>
+  </div>
+
+  <div id="placar" class="resumo-placar">
+    <div class="placar-item">Artigos avaliados: <strong id="placarTotal">0</strong></div>
+    <div class="placar-item">Indexados na Scopus: <strong id="placarScopus">0</strong></div>
+    <div class="placar-item">Nas áreas do Edital: <strong id="placarPontuaveis">0</strong></div>
+    <div class="placar-item">Soma das notas: <strong id="placarNota" style="color: var(--verde);">0,00 pts</strong></div>
+  </div>
+
+  <div class="tabela-container" id="containerTabela" hidden>
+    <table id="tabela">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Artigo / Título</th>
+          <th>Ano</th>
+          <th>Revista</th>
+          <th>Autores</th>
+          <th>Área do Edital (Tabela 2)</th>
+          <th style="text-align: center;">Scopus</th>
+          <th style="text-align: center;">Percentil</th>
+          <th style="text-align: center;">Estrato</th>
+          <th style="text-align: right;">Nota</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <footer>
+    <p><strong>Critérios de pontuação:</strong> Tabela 2 do Edital PEQ/UEM (132 áreas ASJC). Fracionamento de autoria: integral até 4 autores; fator de 4/n para mais de 4 autores.</p>
+    <p>Metadados científicos: <a href="https://www.crossref.org/" target="_blank">Crossref</a> e <a href="https://openalex.org/" target="_blank">OpenAlex</a>. Indexação: Catálogo Oficial Scopus Elsevier (49.104 fontes).</p>
+  </footer>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>

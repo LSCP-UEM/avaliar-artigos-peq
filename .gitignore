@@ -1,0 +1,25 @@
+# Arquivos internos / sensíveis da banca
+1_Painel_Comissao.py
+dossies_recebidos/
+*.docx
+
+# Arquivos brutos pesados de planilhas
+*.xlsx
+*.xls
+*.csv
+
+# Cache do Python e Streamlit
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.streamlit/
+pybliometrics.cfg
+.scopus/
+.scopus_cache/
+cache_scopus/
+
+# Ambiente e SO
+.env
+.DS_Store
+Thumbs.db

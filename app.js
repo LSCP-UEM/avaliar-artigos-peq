@@ -1,0 +1,312 @@
+import {
+  extrairDois, montarIndice, avaliarDoi, calcularNotaManual,
+  emParalelo, formatarIssn,
+} from "./logica.js";
+
+// ---------------------------------------------------------------------------
+// Configurações
+// ---------------------------------------------------------------------------
+const EMAIL_CONTATO = "";
+const CONCORRENCIA = 3;
+const LIMITE_DOIS = 300;
+
+const $ = (id) => document.getElementById(id);
+const el = {
+  entrada: $("entrada"),
+  btn: $("btnAvaliar"),
+  csv: $("btnCsv"),
+  status: $("status"),
+  container: $("containerTabela"),
+  corpo: document.querySelector("#tabela tbody"),
+  placar: $("placar"),
+  placarTotal: $("placarTotal"),
+  placarScopus: $("placarScopus"),
+  placarPontuaveis: $("placarPontuaveis"),
+  placarNota: $("placarNota"),
+};
+
+let indice = null;
+let regras = null;
+let resultados = [];
+
+// ---------------------------------------------------------------------------
+// Inicialização das Bases Estáticas
+// ---------------------------------------------------------------------------
+async function carregarBases() {
+  try {
+    const respRegras = await fetch("data/regras.json");
+    if (respRegras.ok) regras = await respRegras.json();
+
+    // Tenta primeiro o citescore com percentis embutidos; se não existir, usa a lista oficial de fontes
+    let respFontes = await fetch("data/citescore.json");
+    if (!respFontes.ok) {
+      respFontes = await fetch("data/fontes_scopus.json");
+    }
+    if (respFontes.ok) {
+      const dados = await respFontes.json();
+      indice = montarIndice(dados);
+    }
+  } catch (err) {
+    console.error("Erro ao carregar bases estáticas:", err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Renderização
+// ---------------------------------------------------------------------------
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+}[c]));
+
+const fmt = (n, d = 2) => (n == null || n === "" || isNaN(n) ? "—" : Number(n).toLocaleString("pt-BR", {
+  minimumFractionDigits: d, maximumFractionDigits: d,
+}));
+
+function badgeEstrato(estrato) {
+  if (!estrato || estrato === "—") return '<span class="badge cinza">—</span>';
+  return `<span class="badge ${estrato}">${esc(estrato)}</span>`;
+}
+
+function linhaPrincipal(r, i) {
+  const autoresStr = r.n_autores
+    ? `${r.n_autores} autor(es)${r.n_autores > 4 ? ` <small style="color:var(--suave);">(fator ${fmt(r.fator_divisao, 3)})</small>` : ""}`
+    : "—";
+
+  const btnScopus = r.link_revista
+    ? `<a href="${esc(r.link_revista)}" target="_blank" rel="noopener" class="btn-scopus" title="Abrir perfil na Scopus">🔗 Scopus ↗</a>`
+    : '<span style="color:var(--suave); font-size:12px;">Não indexada</span>';
+
+  let areaEditalStr = "—";
+  if (r.status === "fora_areas") {
+    areaEditalStr = '<span class="alerta-fora">⚠️ Fora da Tabela 2</span>';
+  } else if (r.area_principal) {
+    areaEditalStr = `<span class="area-tag">${esc(r.area_principal)}</span>`;
+  } else if (r.areas_edital) {
+    areaEditalStr = r.areas_edital.split(" / ").map((a) => `<span class="area-tag">${esc(a)}</span>`).join(" ");
+  }
+
+  const valPerc = r.percentil != null ? r.percentil : "";
+  const readonly = r.status === "ok" && r.ano_citescore ? "readonly" : "";
+
+  return `
+    <td class="num" style="color:var(--suave);">${i + 1}</td>
+    <td style="max-width: 380px;">
+      <div class="tit">${esc(r.titulo || r.motivo || "Carregando...")}${r.retratado ? ' <span class="badge cinza" style="background:#cf222e;color:#fff;">RETRATADO</span>' : ""}</div>
+      <div class="doi"><a href="${esc(r.link_doi)}" target="_blank">${esc(r.doi)}</a></div>
+    </td>
+    <td class="num">${r.ano ?? "—"}</td>
+    <td style="max-width: 240px;">
+      <strong>${esc(r.revista || "—")}</strong>
+      ${r.scopus_ativa === false ? ' <small style="color:#cf222e;">(Descontinuada)</small>' : ""}
+    </td>
+    <td>${autoresStr}</td>
+    <td>${areaEditalStr}</td>
+    <td style="text-align: center;">${btnScopus}</td>
+    <td style="text-align: center;">
+      <input type="number" min="0" max="100" step="0.1"
+             class="inp-perc" placeholder="%"
+             value="${valPerc}" data-i="${i}" ${readonly}
+             title="Digite o percentil CiteScore visto na página da Scopus">
+    </td>
+    <td style="text-align: center;" id="colEstrato_${i}">${badgeEstrato(r.estrato)}</td>
+    <td class="num" id="colNota_${i}"><strong>${r.nota_final_calculada != null ? fmt(r.nota_final_calculada) + " pts" : "—"}</strong></td>
+  `;
+}
+
+function detalhe(r) {
+  if (r.status === "carregando") return '<td colspan="10">Carregando dados...</td>';
+
+  const linhas = [
+    ["DOI", `<a href="${esc(r.link_doi)}" target="_blank">${esc(r.doi)}</a>`],
+    ["Título completo", esc(r.titulo || "—")],
+    ["Lista de autores", esc((r.autores || []).join("; ") || "—")],
+    ["Revista oficial", `${esc(r.revista || "—")} ${r.scopus_source_id ? `(Scopus Source ID: ${esc(r.scopus_source_id)})` : ""}`],
+    ["ISSN(s)", (r.issns || []).map(formatarIssn).join(", ") || "—"],
+    ["Publicação", [r.data_publicacao || r.ano, r.volume && `Vol. ${r.volume}`, r.numero && `Nº ${r.numero}`, r.paginas && `Págs. ${r.paginas}`].filter(Boolean).map(esc).join(" · ") || "—"],
+    ["Citações do artigo", `Crossref: ${fmt(r.citacoes_crossref, 0)} · OpenAlex: ${fmt(r.citacoes_openalex, 0)}${r.fwci != null ? ` · FWCI: ${fmt(r.fwci)}` : ""}`],
+    ["Acesso Aberto", r.acesso_aberto ? `${esc(r.acesso_aberto)}${r.link_acesso_aberto ? ` (<a href="${esc(r.link_acesso_aberto)}" target="_blank">PDF disponível</a>)` : ""}` : "Não informado"],
+    ["Link direto Scopus", r.link_revista ? `<a href="${esc(r.link_revista)}" target="_blank">${esc(r.link_revista)}</a>` : "Não indexada"],
+  ];
+
+  let areasTabela = "";
+  if (r.todas_areas?.length) {
+    areasTabela = `
+      <div style="margin-top: 10px;">
+        <strong style="font-size: 12px; color: var(--suave);">Classificação ASJC da Scopus para esta revista:</strong>
+        <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
+          ${r.todas_areas.map((a) => `
+            <span class="area-tag" style="${a.area_edital ? 'background:#e7f3fe; border-color:#93c5fd; font-weight:600;' : 'background:#f3f4f6; color:#6b7280; border-color:#e5e7eb;'}">
+              ${esc(a.nome)} (${a.asjc})${a.area_edital ? ` ➔ ${esc(a.area_edital)}` : " (não pontua)"}
+            </span>
+          `).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <td colspan="10">
+      <dl class="grade">${linhas.map(([k, v]) => `<dt>${esc(k)}:</dt><dd>${v}</dd>`).join("")}</dl>
+      ${areasTabela}
+    </td>
+  `;
+}
+
+function desenharLinha(i) {
+  const r = resultados[i];
+  const tr = el.corpo.querySelector(`tr.linha[data-i="${i}"]`);
+  if (!tr) return;
+  tr.innerHTML = linhaPrincipal(r, i);
+  const det = tr.nextElementSibling;
+  if (det && det.classList.contains("detalhe")) {
+    det.innerHTML = detalhe(r);
+  }
+}
+
+function atualizarPlacar() {
+  const total = resultados.length;
+  const scopus = resultados.filter((r) => Boolean(r.scopus_source_id)).length;
+  const pontuaveis = resultados.filter((r) => r.status !== "fora_areas" && r.scopus_source_id).length;
+  const soma = resultados.reduce((acc, r) => acc + (Number(r.nota_final_calculada) || 0), 0);
+
+  el.placarTotal.textContent = total;
+  el.placarScopus.textContent = scopus;
+  el.placarPontuaveis.textContent = pontuaveis;
+  el.placarNota.textContent = `${fmt(soma)} pts`;
+  el.placar.style.display = total > 0 ? "flex" : "none";
+}
+
+// ---------------------------------------------------------------------------
+// Execução Principal
+// ---------------------------------------------------------------------------
+async function avaliar() {
+  let dois = extrairDois(el.entrada.value);
+  if (!dois.length) {
+    el.status.textContent = "Nenhum DOI identificado no texto inserido.";
+    return;
+  }
+  if (dois.length > LIMITE_DOIS) {
+    el.status.textContent = `Limite de ${LIMITE_DOIS} DOIs por lote. Processando os primeiros ${LIMITE_DOIS}...`;
+    dois = dois.slice(0, LIMITE_DOIS);
+  }
+
+  el.btn.disabled = true;
+  el.csv.disabled = true;
+  resultados = dois.map((doi) => ({ doi, status: "carregando" }));
+
+  el.corpo.innerHTML = resultados.map((_, i) => `
+    <tr class="linha" data-i="${i}"></tr>
+    <tr class="detalhe" hidden></tr>
+  `).join("");
+
+  el.container.hidden = false;
+  resultados.forEach((_, i) => desenharLinha(i));
+
+  let feitos = 0;
+  const atualizarProgresso = () => {
+    el.status.textContent = `Processando ${feitos} de ${dois.length} DOIs via Crossref e Scopus...`;
+  };
+  atualizarProgresso();
+
+  await emParalelo(dois, CONCORRENCIA, (doi) => avaliarDoi(doi, { indice, regras, email: EMAIL_CONTATO }), (r, i) => {
+    resultados[i] = r;
+    feitos++;
+    desenharLinha(i);
+    atualizarProgresso();
+    atualizarPlacar();
+  });
+
+  el.status.textContent = `Concluído: ${feitos} artigos consultados. Clique na linha para ver mais detalhes.`;
+  el.btn.disabled = false;
+  el.csv.disabled = false;
+  atualizarPlacar();
+}
+
+// ---------------------------------------------------------------------------
+// Interatividade da Tabela (Input Manual e Expansão)
+// ---------------------------------------------------------------------------
+el.corpo.addEventListener("input", (ev) => {
+  if (ev.target.classList.contains("inp-perc")) {
+    const idx = Number(ev.target.dataset.i);
+    const val = ev.target.value.trim();
+    const r = resultados[idx];
+    if (!r) return;
+
+    if (val === "" || isNaN(val)) {
+      r.percentil = null;
+      r.estrato = null;
+      r.pontos_base = null;
+      r.nota_final_calculada = null;
+    } else {
+      const calc = calcularNotaManual(val, r.n_autores, regras);
+      if (calc) {
+        Object.assign(r, calc);
+      }
+    }
+
+    const colEst = $(`colEstrato_${idx}`);
+    const colNot = $(`colNota_${idx}`);
+    if (colEst) colEst.innerHTML = badgeEstrato(r.estrato);
+    if (colNot) colNot.innerHTML = `<strong>${r.nota_final_calculada != null ? fmt(r.nota_final_calculada) + " pts" : "—"}</strong>`;
+    atualizarPlacar();
+  }
+});
+
+el.corpo.addEventListener("click", (ev) => {
+  if (ev.target.closest("a") || ev.target.closest("input")) return;
+  const tr = ev.target.closest("tr.linha");
+  if (tr) {
+    const det = tr.nextElementSibling;
+    if (det && det.classList.contains("detalhe")) {
+      det.hidden = !det.hidden;
+    }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Exportação CSV
+// ---------------------------------------------------------------------------
+const COLUNAS_CSV = [
+  ["DOI", (r) => r.doi],
+  ["Título", (r) => r.titulo],
+  ["Revista", (r) => r.revista],
+  ["Ano", (r) => r.ano],
+  ["Autores", (r) => (r.autores || []).join("; ")],
+  ["Nº Autores", (r) => r.n_autores],
+  ["Fator Divisão", (r) => r.fator_divisao],
+  ["Indexada Scopus", (r) => (r.scopus_source_id ? "SIM" : "NÃO")],
+  ["Status Scopus", (r) => (r.scopus_ativa === false ? "Descontinuada" : (r.scopus_source_id ? "Ativa" : ""))],
+  ["Área Edital", (r) => r.area_principal || r.areas_edital || ""],
+  ["Percentil Informado", (r) => r.percentil ?? ""],
+  ["Estrato", (r) => r.estrato ?? ""],
+  ["Pontos Base", (r) => r.pontos_base ?? ""],
+  ["Nota Final Calculada", (r) => r.nota_final_calculada ?? ""],
+  ["Link Scopus", (r) => r.link_revista ?? ""],
+  ["Link DOI", (r) => r.link_doi ?? ""],
+];
+
+function baixarCsv() {
+  const cel = (v) => {
+    if (v == null) return "";
+    const s = typeof v === "number" ? String(v).replace(".", ",") : String(v);
+    return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const cabecalho = COLUNAS_CSV.map(([n]) => n).join(";");
+  const linhas = resultados.map((r) => COLUNAS_CSV.map(([, f]) => cel(f(r))).join(";"));
+  const conteudo = "\ufeff" + [cabecalho, ...linhas].join("\r\n");
+
+  const blob = new Blob([conteudo], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `avaliacao_artigos_peq_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+el.btn.addEventListener("click", avaliar);
+el.csv.addEventListener("click", baixarCsv);
+el.entrada.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) avaliar();
+});
+
+carregarBases();

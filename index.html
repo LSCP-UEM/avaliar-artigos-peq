@@ -250,6 +250,42 @@
       border-top: 1px solid var(--borda);
       padding-top: 14px;
     }
+    .btn-favorito {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #f0fdf4;
+      color: #166534;
+      border: 1px dashed #22c55e;
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 12px;
+      text-decoration: none;
+      cursor: grab;
+    }
+    .btn-favorito:hover {
+      background: #dcfce7;
+      border-color: #16a34a;
+      text-decoration: none;
+    }
+    .dica-lattes {
+      margin-bottom: 14px;
+      background: #fff;
+      border: 1px solid var(--borda);
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 13px;
+    }
+    .dica-lattes summary {
+      font-weight: 600;
+      cursor: pointer;
+      color: var(--azul);
+      user-select: none;
+    }
+    .dica-lattes summary:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
@@ -266,10 +302,40 @@
     </div>
   </div>
 
-  <textarea id="entrada" placeholder="Cole os DOIs aqui (um por linha, com ou sem prefixo https://doi.org/)...&#10;10.1016/j.cej.2020.127573&#10;10.1016/j.jcis.2021.05.042&#10;10.1038/s41586-020-2649-2"></textarea>
+  <details class="dica-lattes">
+    <summary>📋 Como extrair todos os DOIs de um Currículo Lattes? (Clique para ver 3 formas rápidas)</summary>
+    <div style="margin-top: 10px; line-height: 1.6; color: #333;">
+      <p style="margin: 0 0 8px;">No Lattes do CNPq, os DOIs não ficam como texto visível — ficam nos <strong>links das figurinhas</strong> ao lado de cada publicação. Para facilitar, temos 3 soluções integradas:</p>
+      <ol style="padding-left: 20px; margin: 0 0 10px;">
+        <li>
+          <strong>Copiar e Colar direto (Automático):</strong> Na página do Lattes aberta no navegador, selecione a lista de artigos (ou pressione <code>Ctrl+A</code>), copie com <code>Ctrl+C</code> e cole com <code>Ctrl+V</code> na caixa abaixo. O sistema intercepta o HTML da área de transferência e extrai todos os links dos ícones do Lattes na hora!
+        </li>
+        <li>
+          <strong>Importar Arquivo do Lattes:</strong> Se você baixou o seu <code>curriculo.xml</code> do CNPq ou salvou a página do Lattes como arquivo <code>.html</code>, clique no botão <strong>📁 Importar Lattes</strong> abaixo ou simplesmente arraste o arquivo para a caixa de texto.
+        </li>
+        <li>
+          <strong>Extrator em 1 Clique (Barra de Favoritos):</strong> Arraste o botão verde abaixo para a sua <em>Barra de Favoritos</em> do navegador. Quando estiver na página de qualquer Lattes, clique nesse favorito e todos os DOIs serão copiados para a sua área de transferência:
+          <div style="margin: 8px 0;">
+            <a href="javascript:(function(){const s=new Set();document.querySelectorAll('a[href*=&quot;doi.org&quot;],a[href*=&quot;dx.doi.org&quot;]').forEach(a=>{const m=a.href.match(/10\.\d{4,9}\/[^\s&quot;'<>,]+/);if(m){let d=m[0].split(/[?#]/)[0];try{if(d.includes('%'))d=decodeURIComponent(d);}catch(e){}s.add(d);}});const l=[...s];if(!l.length){alert('Nenhum link de DOI encontrado nesta página do Lattes!');return;}navigator.clipboard.writeText(l.join('\n')).then(()=>alert('🎉 '+l.length+' DOIs copiados com sucesso!\n\nAgora basta colar (Ctrl+V) no Avaliador.')).catch(()=>prompt('Copie os DOIs abaixo:',l.join('\n')));})();"
+               class="btn-favorito"
+               title="Arraste para a sua Barra de Favoritos do navegador"
+               onclick="alert('Arraste este botão para a sua Barra de Favoritos do Chrome/Edge/Firefox. Depois, basta clicar nele em qualquer página de Currículo Lattes!'); return false;">
+              ⭐ Copiar DOIs do Lattes
+            </a>
+            <span style="font-size: 11px; color: var(--suave); margin-left: 8px;">(Arraste este botão para a barra de favoritos do navegador)</span>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </details>
+
+  <textarea id="entrada" placeholder="Cole os DOIs aqui (um por linha)...&#10;Dica: Se você copiar o texto do Lattes no navegador e colar aqui (Ctrl+V), os DOIs das figurinhas serão extraídos automaticamente!&#10;&#10;10.1016/j.cej.2020.127573&#10;10.1016/j.jcis.2021.05.042"></textarea>
 
   <div class="acoes">
     <button id="btnAvaliar" class="principal">🔍 Avaliar Lista de DOIs</button>
+    <button id="btnImportarLattes" type="button" title="Carregar arquivo curriculo.xml ou página .html salva">📁 Importar Lattes (XML / HTML)</button>
+    <input type="file" id="arquivoLattes" accept=".xml,.html,.htm,.txt" style="display: none;">
+    <button id="btnLimpar" type="button" style="color: var(--suave);">🗑️ Limpar</button>
     <button id="btnCsv" disabled>📥 Baixar Planilha Consolidada (CSV)</button>
     <span id="status"></span>
   </div>

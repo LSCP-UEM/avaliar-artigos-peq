@@ -14,6 +14,9 @@ const $ = (id) => document.getElementById(id);
 const el = {
   entrada: $("entrada"),
   btn: $("btnAvaliar"),
+  btnImportarLattes: $("btnImportarLattes"),
+  arquivoLattes: $("arquivoLattes"),
+  btnLimpar: $("btnLimpar"),
   csv: $("btnCsv"),
   status: $("status"),
   container: $("containerTabela"),
@@ -307,6 +310,99 @@ el.btn.addEventListener("click", avaliar);
 el.csv.addEventListener("click", baixarCsv);
 el.entrada.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) avaliar();
+});
+
+// ---------------------------------------------------------------------------
+// Extração e Importação do Lattes (Paste Inteligente, Upload e Drag & Drop)
+// ---------------------------------------------------------------------------
+function mesclarDoisNaEntrada(novosDois, substituir = false) {
+  if (!novosDois || !novosDois.length) return 0;
+  let final = novosDois;
+  if (!substituir && el.entrada.value.trim()) {
+    const existentes = extrairDois(el.entrada.value);
+    const unicosNovos = novosDois.filter(
+      (d) => !existentes.some((x) => x.toLowerCase() === d.toLowerCase())
+    );
+    final = [...existentes, ...unicosNovos];
+  }
+  el.entrada.value = final.join("\n");
+  return novosDois.length;
+}
+
+// 1. Interceptador de Paste: Lê HTML copiado do Lattes (com DOIs nas tags <a>/<img>)
+el.entrada.addEventListener("paste", (ev) => {
+  const html = ev.clipboardData?.getData("text/html");
+  const texto = ev.clipboardData?.getData("text/plain");
+
+  if (html) {
+    const doisHtml = extrairDois(html);
+    const doisTexto = extrairDois(texto);
+
+    // Se o HTML capturou DOIs que o texto puro do navegador perdeu (caso típico do Lattes!):
+    if (doisHtml.length > doisTexto.length) {
+      ev.preventDefault();
+      const n = mesclarDoisNaEntrada(doisHtml, !el.entrada.value.trim());
+      el.status.textContent = `✨ ${n} DOI(s) extraído(s) automaticamente dos links/ícones do Lattes colado!`;
+    }
+  }
+});
+
+// 2. Leitura de Arquivo (curriculo.xml ou lattes.html)
+function processarArquivo(arquivo) {
+  if (!arquivo) return;
+  const leitor = new FileReader();
+  leitor.onload = (e) => {
+    const conteudo = String(e.target?.result || "");
+    const dois = extrairDois(conteudo);
+    if (!dois.length) {
+      el.status.textContent = `⚠️ Nenhum DOI identificado no arquivo "${arquivo.name}".`;
+      return;
+    }
+    const n = mesclarDoisNaEntrada(dois, !el.entrada.value.trim());
+    el.status.textContent = `✅ ${n} DOI(s) extraído(s) com sucesso de "${arquivo.name}"!`;
+  };
+  leitor.onerror = () => {
+    el.status.textContent = `❌ Erro ao ler o arquivo "${arquivo.name}".`;
+  };
+  leitor.readAsText(arquivo);
+}
+
+el.btnImportarLattes?.addEventListener("click", () => el.arquivoLattes.click());
+el.arquivoLattes?.addEventListener("change", (ev) => {
+  const file = ev.target.files?.[0];
+  if (file) processarArquivo(file);
+  ev.target.value = "";
+});
+
+// 3. Drag & Drop sobre a caixa de texto
+el.entrada.addEventListener("dragover", (ev) => {
+  ev.preventDefault();
+  el.entrada.style.borderColor = "var(--azul)";
+  el.entrada.style.background = "#f0f7ff";
+});
+el.entrada.addEventListener("dragleave", () => {
+  el.entrada.style.borderColor = "";
+  el.entrada.style.background = "";
+});
+el.entrada.addEventListener("drop", (ev) => {
+  ev.preventDefault();
+  el.entrada.style.borderColor = "";
+  el.entrada.style.background = "";
+  const files = ev.dataTransfer?.files;
+  if (files && files.length > 0) {
+    processarArquivo(files[0]);
+  }
+});
+
+// 4. Botão Limpar
+el.btnLimpar?.addEventListener("click", () => {
+  el.entrada.value = "";
+  el.container.hidden = true;
+  el.corpo.innerHTML = "";
+  el.placar.style.display = "none";
+  el.status.textContent = "";
+  el.csv.disabled = true;
+  resultados = [];
 });
 
 carregarBases();

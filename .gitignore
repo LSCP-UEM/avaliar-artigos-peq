@@ -2,6 +2,7 @@
 1_Painel_Comissao.py
 dossies_recebidos/
 *.docx
+*.pdf
 
 # Arquivos brutos pesados de planilhas
 *.xlsx

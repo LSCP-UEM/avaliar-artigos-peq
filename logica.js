@@ -17,10 +17,15 @@ export function extrairDois(texto) {
   const vistos = new Map();
   for (const m of fonte.matchAll(PADRAO_DOI)) {
     let doi = m[0];
-    while (/[.;:\]}'"]$/.test(doi) || (doi.endsWith(")") && contar(doi, ")") > contar(doi, "("))) {
+    // Remove query params e hash se veio de URL (?utm=..., #...)
+    doi = doi.split(/[?#]/)[0];
+    // Corta entidades HTML que possam ter ficado grudadas
+    doi = doi.replace(/&(?:quot|apos|lt|gt|amp|#\d+|#x[0-9a-f]+);?.*$/i, "");
+    while (/[.;:\]}'"\/]$/.test(doi) || (doi.endsWith(")") && contar(doi, ")") > contar(doi, "("))) {
       doi = doi.slice(0, -1);
     }
     try { if (doi.includes("%")) doi = decodeURIComponent(doi); } catch { /* mantém */ }
+    if (!doi || !doi.startsWith("10.")) continue;
     const chave = doi.toLowerCase();
     if (!vistos.has(chave)) vistos.set(chave, doi);
   }

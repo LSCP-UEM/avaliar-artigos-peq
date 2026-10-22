@@ -286,6 +286,10 @@ export function avaliarRevista(meta, indice, regras) {
     scopus_via: achado.via,
     scopus_ativa: r.act ?? true,
     link_revista: linkRevista,
+    citescore: r.cs ?? null,
+    sjr: r.sjr ?? null,
+    snip: r.snip ?? null,
+    ano_citescore: indice?.meta?.ano_citescore || 2025,
     todas_areas: analise.todas,
     fator_divisao: fator,
   };

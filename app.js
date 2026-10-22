@@ -108,7 +108,6 @@ function linhaPrincipal(r, i, aberta = false) {
   }
 
   const valPerc = r.percentil != null ? r.percentil : "";
-  const readonly = r.status === "ok" && r.ano_citescore ? "readonly" : "";
 
   return `
     <td class="col-indice">
@@ -136,12 +135,19 @@ function linhaPrincipal(r, i, aberta = false) {
       ${jcrBadge}
     </td>
     <td>${areaEditalStr}</td>
-    <td style="text-align: center;">${btnScopus}</td>
     <td style="text-align: center;">
-      <input type="number" min="0" max="100" step="0.1"
-             class="inp-perc" placeholder="%"
-             value="${valPerc}" data-i="${i}" ${readonly}
-             title="Digite o percentil CiteScore visto na página da Scopus">
+      ${btnScopus}
+      ${r.sjr != null ? `<div style="font-size: 11px; color: var(--suave); margin-top: 3px;" title="SCImago Journal Rank">SJR: <strong>${fmt(r.sjr, 3)}</strong></div>` : ""}
+    </td>
+    <td style="text-align: center;">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+        ${r.citescore != null ? `<div style="font-size: 12px; font-weight: 700; color: #1a7f37;" title="CiteScore oficial">CS: ${fmt(r.citescore, 1)}</div>` : ""}
+        <input type="number" min="0" max="100" step="1"
+               class="inp-perc" placeholder="%"
+               value="${valPerc}" data-i="${i}"
+               title="Percentil oficial da melhor subárea do Edital (editável)">
+        ${r.rank && r.rank_de ? `<span style="font-size: 10px; color: var(--suave); white-space: nowrap;">Rank ${r.rank}/${r.rank_de}</span>` : ""}
+      </div>
     </td>
     <td style="text-align: center;" id="colEstrato_${i}">${badgeEstrato(r.estrato)}</td>
     <td class="num" id="colNota_${i}"><strong>${r.nota_final_calculada != null ? fmt(r.nota_final_calculada) + " pts" : "—"}</strong></td>
@@ -158,6 +164,13 @@ function detalhe(r) {
     ["Revista oficial", `${esc(r.revista || "—")} ${r.scopus_source_id ? `(Scopus Source ID: ${esc(r.scopus_source_id)})` : ""}`],
     ["ISSN(s)", (r.issns || []).map(formatarIssn).join(", ") || "—"],
     ["Fator de Impacto JCR (2026)", r.jcr != null ? `<strong>${fmt(r.jcr, 3)}</strong>${r.jcr_quartil ? ` (${r.jcr_quartil})` : ""} · Clarivate Web of Science` : "Não localizado na base JCR 2026"],
+    ["Métricas Scopus (Elsevier)", [
+      r.citescore != null && `CiteScore: <strong>${fmt(r.citescore, 1)}</strong>`,
+      r.percentil != null && `Melhor Percentil (Edital): <strong>${r.percentil}%</strong>`,
+      r.rank && r.rank_de && `Rank na Subárea: <strong>${r.rank} de ${r.rank_de}</strong>`,
+      r.sjr != null && `SJR: <strong>${fmt(r.sjr, 3)}</strong>`,
+      r.snip != null && `SNIP: <strong>${fmt(r.snip, 3)}</strong>`,
+    ].filter(Boolean).join(" · ") || "—"],
     ["Publicação", [r.data_publicacao || r.ano, r.volume && `Vol. ${r.volume}`, r.numero && `Nº ${r.numero}`, r.paginas && `Págs. ${r.paginas}`].filter(Boolean).map(esc).join(" · ") || "—"],
     ["Citações do artigo", `Crossref: ${fmt(r.citacoes_crossref, 0)} · OpenAlex: ${fmt(r.citacoes_openalex, 0)}${r.fwci != null ? ` · FWCI: ${fmt(r.fwci)}` : ""}`],
     ["Acesso Aberto", r.acesso_aberto ? `${esc(r.acesso_aberto)}${r.link_acesso_aberto ? ` (<a href="${esc(r.link_acesso_aberto)}" target="_blank">PDF disponível</a>)` : ""}` : "Não informado"],
@@ -172,7 +185,7 @@ function detalhe(r) {
         <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
           ${r.todas_areas.map((a) => `
             <span class="area-tag" style="${a.area_edital ? 'background:#e7f3fe; border-color:#93c5fd; font-weight:600;' : 'background:#f3f4f6; color:#6b7280; border-color:#e5e7eb;'}">
-              ${esc(a.nome)} (${a.asjc})${a.area_edital ? ` ➔ ${esc(a.area_edital)}` : " (não pontua)"}
+              ${esc(a.nome)} (${a.asjc})${a.percentil != null ? ` · <strong>${a.percentil}%</strong>` : ""}${a.rank && a.de ? ` (#${a.rank}/${a.de})` : ""}${a.area_edital ? ` ➔ ${esc(a.area_edital)}` : " (não pontua)"}
             </span>
           `).join("")}
         </div>
@@ -373,7 +386,7 @@ el.filtroTabela?.addEventListener("input", (ev) => {
     const r = resultados[idx];
     const det = tr.nextElementSibling;
     if (!r) return;
-    const textoCompleto = `${r.doi || ""} ${r.titulo || ""} ${r.revista || ""} ${r.ano || ""} ${(r.autores || []).join(" ")} ${r.estrato || ""} ${r.area_principal || r.areas_edital || ""} ${r.jcr || ""} ${r.jcr_quartil || ""}`.toLowerCase();
+    const textoCompleto = `${r.doi || ""} ${r.titulo || ""} ${r.revista || ""} ${r.ano || ""} ${(r.autores || []).join(" ")} ${r.estrato || ""} ${r.area_principal || r.areas_edital || ""} ${r.jcr || ""} ${r.jcr_quartil || ""} ${r.citescore || ""} ${r.sjr || ""}`.toLowerCase();
     const bate = !termo || textoCompleto.includes(termo);
     tr.style.display = bate ? "" : "none";
     if (det && det.classList.contains("detalhe")) {
@@ -395,12 +408,16 @@ const COLUNAS_CSV = [
   ["Autores", (r) => (r.autores || []).join("; ")],
   ["Nº Autores", (r) => r.n_autores],
   ["Multiplicador Autoria", (r) => r.fator_divisao],
+  ["CiteScore", (r) => (r.citescore != null ? r.citescore : "")],
+  ["Percentil Scopus", (r) => (r.percentil != null ? r.percentil : "")],
+  ["Scopus Rank", (r) => (r.rank && r.rank_de ? `${r.rank}/${r.rank_de}` : "")],
+  ["SJR", (r) => (r.sjr != null ? r.sjr : "")],
+  ["SNIP", (r) => (r.snip != null ? r.snip : "")],
   ["JCR Impact Factor", (r) => (r.jcr != null ? r.jcr : "")],
   ["JCR Quartil", (r) => r.jcr_quartil || ""],
   ["Indexada Scopus", (r) => (r.scopus_source_id ? "SIM" : "NÃO")],
   ["Status Scopus", (r) => (r.scopus_ativa === false ? "Descontinuada" : (r.scopus_source_id ? "Ativa" : ""))],
   ["Área Edital", (r) => r.area_principal || r.areas_edital || ""],
-  ["Percentil Informado", (r) => r.percentil ?? ""],
   ["Estrato", (r) => r.estrato ?? ""],
   ["Pontos Base", (r) => r.pontos_base ?? ""],
   ["Nota Final Calculada", (r) => r.nota_final_calculada ?? ""],

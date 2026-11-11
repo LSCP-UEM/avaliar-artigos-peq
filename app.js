@@ -141,11 +141,11 @@ function linhaPrincipal(r, i, aberta = false) {
     </td>
     <td style="text-align: center;">
       <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
-        ${r.citescore != null ? `<div style="font-size: 12px; font-weight: 700; color: #1a7f37;" title="CiteScore oficial">CS: ${fmt(r.citescore, 1)}</div>` : ""}
+        ${r.citescore != null ? `<div style="font-size: 12px; font-weight: 700; color: #1a7f37;" title="CiteScore (base 2025)">CS: ${fmt(r.citescore, 1)}</div>` : ""}
         <input type="number" min="0" max="100" step="1"
                class="inp-perc" placeholder="%"
                value="${valPerc}" data-i="${i}"
-               title="Percentil oficial da melhor subárea do Edital (editável)">
+               title="Percentil da melhor subárea do Edital, base CiteScore 2025 (editável; estimativa, não oficial)">
         ${r.rank && r.rank_de ? `<span style="font-size: 10px; color: var(--suave); white-space: nowrap;">Rank ${r.rank}/${r.rank_de}</span>` : ""}
       </div>
     </td>
